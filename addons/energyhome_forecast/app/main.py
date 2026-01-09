@@ -7,7 +7,7 @@ from typing import Dict, List
 
 import pandas as pd
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from zoneinfo import ZoneInfo
 
 import forecast as forecast_module
@@ -194,6 +194,11 @@ async def startup_event() -> None:
 async def shutdown_event() -> None:
     if ha_client is not None:
         await ha_client.close()
+
+
+@app.get("/")
+async def root() -> RedirectResponse:
+    return RedirectResponse(url="/ui")
 
 
 @app.get("/health")

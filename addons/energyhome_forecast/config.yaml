@@ -26,9 +26,9 @@ options:
     l2_load_power: sensor.inverter_load_l2_power
     l3_load_power: sensor.inverter_load_l3_power
     soc: sensor.inverter_battery
-    grid_l1_current: sensor.inverter_grid_l1_current
-    grid_l2_current: sensor.inverter_grid_l2_current
-    grid_l3_current: sensor.inverter_grid_l3_current
+    grid_l1_current: ""
+    grid_l2_current: ""
+    grid_l3_current: ""
 schema:
   ha_url: str?
   ha_token: password?

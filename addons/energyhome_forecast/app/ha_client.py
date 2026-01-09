@@ -35,7 +35,18 @@ class HAClient:
                 except ValueError:
                     logger.warning("Failed to parse state for %s: %s", entity_id, state)
                     return None
-            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+            except httpx.HTTPStatusError as exc:
+                # 404 means entity doesn't exist - don't retry, just log once and return None
+                if exc.response.status_code == 404:
+                    logger.warning("Entity %s not found in HA (404). Disabling it.", entity_id)
+                    return None
+                # For other HTTP errors (5xx), retry
+                if attempt == 4:
+                    raise
+                logger.warning("HA request failed for %s (attempt %s): %s", entity_id, attempt, exc)
+                continue
+            except httpx.RequestError as exc:
+                # Network/timeout errors - retry
                 if attempt == 4:
                     raise
                 logger.warning("HA request failed for %s (attempt %s): %s", entity_id, attempt, exc)

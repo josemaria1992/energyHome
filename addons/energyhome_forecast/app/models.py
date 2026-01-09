@@ -8,10 +8,10 @@ import os
 
 @dataclass
 class EntityConfig:
-    total_load_power: str
-    l1_load_power: str
-    l2_load_power: str
-    l3_load_power: str
+    total_load_power: str | None
+    l1_load_power: str | None
+    l2_load_power: str | None
+    l3_load_power: str | None
     soc: str | None
     grid_l1_current: str | None
     grid_l2_current: str | None
@@ -29,11 +29,24 @@ class AppConfig:
     db_path: str
 
 
-def _optional_env(name: str) -> str | None:
-    value = os.environ.get(name)
-    if not value or value.lower() in {"none", "null"}:
+def normalize_entity_id(s: str | None) -> str | None:
+    """Normalize entity ID from config, treating various forms as disabled."""
+    if s is None:
         return None
-    return value
+    s = s.strip()
+    # Remove surrounding quotes if present (e.g. '" "' becomes ' ' then empty)
+    if len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
+        s = s[1:-1].strip()
+    # Treat empty string, None, "none", "null", "disabled" (case-insensitive) as DISABLED
+    if s == "" or s.lower() in {"none", "null", "disabled"}:
+        return None
+    return s
+
+
+def _optional_env(name: str) -> str | None:
+    """Read optional environment variable with normalization."""
+    value = os.environ.get(name)
+    return normalize_entity_id(value)
 
 
 def load_config() -> AppConfig:
@@ -45,10 +58,10 @@ def load_config() -> AppConfig:
         timezone=os.environ.get("TIMEZONE", "Europe/Stockholm"),
         horizon_hours=int(os.environ.get("HORIZON_HOURS", "48")),
         entities=EntityConfig(
-            total_load_power=os.environ.get("ENTITY_TOTAL_LOAD_POWER", ""),
-            l1_load_power=os.environ.get("ENTITY_L1_LOAD_POWER", ""),
-            l2_load_power=os.environ.get("ENTITY_L2_LOAD_POWER", ""),
-            l3_load_power=os.environ.get("ENTITY_L3_LOAD_POWER", ""),
+            total_load_power=normalize_entity_id(os.environ.get("ENTITY_TOTAL_LOAD_POWER", "")),
+            l1_load_power=normalize_entity_id(os.environ.get("ENTITY_L1_LOAD_POWER", "")),
+            l2_load_power=normalize_entity_id(os.environ.get("ENTITY_L2_LOAD_POWER", "")),
+            l3_load_power=normalize_entity_id(os.environ.get("ENTITY_L3_LOAD_POWER", "")),
             soc=_optional_env("ENTITY_SOC"),
             grid_l1_current=_optional_env("ENTITY_GRID_L1_CURRENT"),
             grid_l2_current=_optional_env("ENTITY_GRID_L2_CURRENT"),
