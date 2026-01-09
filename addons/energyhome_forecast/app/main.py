@@ -174,7 +174,7 @@ def build_history(hours: int) -> Dict[str, List]:
     rows = fetch_binned_since(config.db_path, start_local)
     df = _dataframe_from_rows(rows)
     return {
-        "timestamps": df["ts_local"].dt.isoformat().tolist(),
+        "timestamps": df["ts_local"].dt.strftime("%Y-%m-%dT%H:%M:%S%z").tolist(),
         "total_w": df.get("total_w", pd.Series(dtype=float)).tolist(),
         "l1_w": df.get("l1_w", pd.Series(dtype=float)).tolist(),
         "l2_w": df.get("l2_w", pd.Series(dtype=float)).tolist(),
