@@ -10,11 +10,11 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from zoneinfo import ZoneInfo
 
-from . import forecast as forecast_module
-from .ha_client import HAClient
-from .ilc import should_update_ilc, update_ilc_curve
-from .models import AppConfig, load_config
-from .storage import (
+import forecast as forecast_module
+from ha_client import HAClient
+from ilc import should_update_ilc, update_ilc_curve
+from models import AppConfig, load_config
+from storage import (
     fetch_binned_between,
     fetch_binned_since,
     fetch_ilc_curve,
@@ -26,7 +26,7 @@ from .storage import (
     set_metadata,
     upsert_binned,
 )
-from .ui import render_dashboard
+from ui import render_dashboard
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("energyhome")

@@ -5,7 +5,7 @@ from typing import Dict, List
 
 import numpy as np
 
-from .storage import fetch_binned_between
+from storage import fetch_binned_between
 
 
 def smooth_curve(values: Dict[int, float]) -> Dict[int, float]:
