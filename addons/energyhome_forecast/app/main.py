@@ -187,6 +187,8 @@ async def startup_event() -> None:
     global ha_client
     init_db(config.db_path)
     ha_client = HAClient(config.ha_url, config.ha_token)
+    # Validate auth before starting poll loop to prevent endless log spam
+    await ha_client.validate_auth()
     asyncio.create_task(poll_loop())
 
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
+import os
 from dataclasses import dataclass
 from typing import Dict
 
-import os
+logger = logging.getLogger("energyhome")
 
 
 @dataclass
@@ -50,10 +52,36 @@ def _optional_env(name: str) -> str | None:
 
 
 def load_config() -> AppConfig:
-    supervisor_token = os.environ.get("SUPERVISOR_TOKEN", "")
+    """Load configuration with deterministic auth mode selection."""
+    # 1) Normalize ha_url
+    base_url = os.environ.get("HA_URL", "").strip()
+    base_url = base_url.rstrip("/")  # remove trailing slash to avoid //api/...
+
+    # 2) Normalize ha_token
+    token_cfg = os.environ.get("HA_TOKEN", "").strip()
+
+    # 3) Choose auth mode deterministically
+    if token_cfg:
+        # Mode A: Manual token mode
+        token = token_cfg
+        if not base_url:
+            base_url = "http://homeassistant:8123"
+        logger.info("HA auth mode: manual token -> using %s", base_url)
+    else:
+        # Mode B: Supervisor token mode (no manual token)
+        supervisor_token = os.environ.get("SUPERVISOR_TOKEN", "")
+        if not supervisor_token:
+            raise ValueError(
+                "HA auth failed: ha_token is empty and SUPERVISOR_TOKEN not available. "
+                "Please set ha_token in add-on configuration."
+            )
+        token = supervisor_token
+        base_url = "http://supervisor/core"
+        logger.info("HA auth mode: supervisor token (ha_token empty) -> using http://supervisor/core")
+
     return AppConfig(
-        ha_url=os.environ.get("HA_URL", "http://supervisor/core"),
-        ha_token=os.environ.get("HA_TOKEN", supervisor_token),
+        ha_url=base_url,
+        ha_token=token,
         poll_interval_minutes=int(os.environ.get("POLL_INTERVAL_MINUTES", "15")),
         timezone=os.environ.get("TIMEZONE", "Europe/Stockholm"),
         horizon_hours=int(os.environ.get("HORIZON_HOURS", "48")),
