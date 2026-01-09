@@ -211,13 +211,11 @@ async def startup_event() -> None:
 async def shutdown_event() -> None:
     if ha_client is not None:
         await ha_client.close()
-
-
+        
 @app.get("/")
 async def root() -> RedirectResponse:
-    return RedirectResponse(url="/ui")
-
-
+    return RedirectResponse(url="ui")
+    
 @app.get("/health")
 async def health() -> Dict[str, str]:
     return {"status": "ok"}
