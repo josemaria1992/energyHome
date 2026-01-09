@@ -43,4 +43,4 @@ else
   bashio::log.info "Creating new database at ${DB_PATH}"
 fi
 
-exec uvicorn app.main:app --host 0.0.0.0 --port 8080
+exec uvicorn main:app --app-dir /app --host 0.0.0.0 --port 8080
