@@ -108,13 +108,28 @@ async def poll_once() -> None:
     set_metadata(config.db_path, "last_poll_utc", ts_utc.isoformat())
     await maybe_update_ilc(bin_start)
 
+    # Log poll completion summary
+    next_poll = _now_utc() + timedelta(minutes=config.poll_interval_minutes)
+    logger.info(
+        "Poll complete: inserted=%d measurements, bin=%s, next_poll_in=%d min (at %s UTC)",
+        len(measurements),
+        bin_start.isoformat(),
+        config.poll_interval_minutes,
+        next_poll.strftime("%H:%M:%S"),
+    )
+
 
 async def poll_loop() -> None:
+    first_poll = True
     while True:
         try:
             await poll_once()
+            if first_poll:
+                first_poll = False
         except Exception as exc:  # noqa: BLE001
             logger.exception("Polling failed: %s", exc)
+        next_poll = _now_utc() + timedelta(minutes=config.poll_interval_minutes)
+        logger.info("Next poll scheduled in %d minutes (at %s UTC)", config.poll_interval_minutes, next_poll.strftime("%H:%M:%S"))
         await asyncio.sleep(config.poll_interval_minutes * 60)
 
 
@@ -240,6 +255,18 @@ async def ilc_update() -> Dict[str, str]:
     now_local = _now_utc().astimezone(_local_tz())
     await maybe_update_ilc(now_local)
     return {"status": "ok"}
+
+
+@app.post("/api/poll_now")
+async def poll_now() -> Dict[str, str]:
+    """Trigger an immediate poll for testing/development."""
+    logger.info("Manual poll triggered via /api/poll_now")
+    try:
+        await poll_once()
+        return {"status": "ok", "message": "Poll completed successfully"}
+    except Exception as exc:
+        logger.exception("Manual poll failed: %s", exc)
+        return {"status": "error", "message": str(exc)}
 
 
 @app.get("/ui", response_class=HTMLResponse)
