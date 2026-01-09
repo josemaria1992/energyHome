@@ -18,6 +18,7 @@ class EntityConfig:
     grid_l1_current: str | None
     grid_l2_current: str | None
     grid_l3_current: str | None
+    inverter_load_power: str | None
 
 
 @dataclass
@@ -94,6 +95,7 @@ def load_config() -> AppConfig:
             grid_l1_current=_optional_env("ENTITY_GRID_L1_CURRENT"),
             grid_l2_current=_optional_env("ENTITY_GRID_L2_CURRENT"),
             grid_l3_current=_optional_env("ENTITY_GRID_L3_CURRENT"),
+            inverter_load_power=_optional_env("ENTITY_INVERTER_LOAD_POWER"),
         ),
         db_path=os.environ.get("DB_PATH", "/data/energyhome.sqlite"),
     )

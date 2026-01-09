@@ -27,6 +27,18 @@ def render_dashboard(
         col=1,
     )
 
+    # Add inverter load traces to Row 1
+    fig.add_trace(
+        go.Scatter(x=history_times, y=history.get("inverter_w", []), name="Inverter Actual"),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(x=forecast_times, y=forecast.get("inverter_w", []), name="Inverter Forecast"),
+        row=1,
+        col=1,
+    )
+
     for phase in ["l1_w", "l2_w", "l3_w"]:
         fig.add_trace(
             go.Scatter(

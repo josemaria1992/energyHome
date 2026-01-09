@@ -51,7 +51,7 @@ def _local_bin_start(ts_utc: datetime) -> datetime:
 
 def _dataframe_from_rows(rows: List[Dict[str, object]]) -> pd.DataFrame:
     if not rows:
-        return pd.DataFrame(columns=["ts_local", "total_w", "l1_w", "l2_w", "l3_w"])
+        return pd.DataFrame(columns=["ts_local", "total_w", "l1_w", "l2_w", "l3_w", "inverter_w"])
     df = pd.DataFrame(rows)
     df["ts_local"] = pd.to_datetime(df["ts_local_bin_start"], utc=False)
     return df
@@ -65,6 +65,7 @@ async def poll_once() -> None:
         "l1_w": entities.l1_load_power,
         "l2_w": entities.l2_load_power,
         "l3_w": entities.l3_load_power,
+        "inverter_w": entities.inverter_load_power,
     }
     optional_entities = {
         "soc": entities.soc,
@@ -103,6 +104,7 @@ async def poll_once() -> None:
         results.get("l1_w"),
         results.get("l2_w"),
         results.get("l3_w"),
+        results.get("inverter_w"),
     )
 
     set_metadata(config.db_path, "last_poll_utc", ts_utc.isoformat())
@@ -149,7 +151,13 @@ async def maybe_update_ilc(bin_start: datetime) -> None:
         return
 
     baseline_df = df[df["ts_local"].dt.date < today]
-    for signal, cmax in {"total_w": 4000.0, "l1_w": 2000.0, "l2_w": 2000.0, "l3_w": 2000.0}.items():
+    for signal, cmax in {
+        "total_w": 4000.0,
+        "l1_w": 2000.0,
+        "l2_w": 2000.0,
+        "l3_w": 2000.0,
+        "inverter_w": 4000.0,
+    }.items():
         baseline = forecast_module.compute_baseline(baseline_df, signal)
         baseline = forecast_module.smooth_baseline(baseline)
         existing_curve = fetch_ilc_curve(config.db_path, signal)
@@ -179,6 +187,7 @@ def build_history(hours: int) -> Dict[str, List]:
         "l1_w": df.get("l1_w", pd.Series(dtype=float)).tolist(),
         "l2_w": df.get("l2_w", pd.Series(dtype=float)).tolist(),
         "l3_w": df.get("l3_w", pd.Series(dtype=float)).tolist(),
+        "inverter_w": df.get("inverter_w", pd.Series(dtype=float)).tolist(),
     }
 
 
@@ -192,6 +201,7 @@ def build_forecast_payload() -> Dict[str, List]:
         "l1_w": fetch_ilc_curve(config.db_path, "l1_w"),
         "l2_w": fetch_ilc_curve(config.db_path, "l2_w"),
         "l3_w": fetch_ilc_curve(config.db_path, "l3_w"),
+        "inverter_w": fetch_ilc_curve(config.db_path, "inverter_w"),
     }
     timestamps, values = forecast_module.build_forecast(df, config.horizon_hours, curves)
     return {"timestamps": timestamps, **values}

@@ -29,6 +29,7 @@ options:
     grid_l1_current: ""
     grid_l2_current: ""
     grid_l3_current: ""
+    inverter_load_power: ""
 schema:
   ha_url: str?
   ha_token: password?
@@ -44,3 +45,4 @@ schema:
     grid_l1_current: str?
     grid_l2_current: str?
     grid_l3_current: str?
+    inverter_load_power: str?

@@ -24,7 +24,8 @@ def init_db(db_path: str) -> None:
                 total_w REAL,
                 l1_w REAL,
                 l2_w REAL,
-                l3_w REAL
+                l3_w REAL,
+                inverter_w REAL
             )
             """
         )
@@ -46,6 +47,11 @@ def init_db(db_path: str) -> None:
             )
             """
         )
+        # Migration: Add inverter_w column for existing databases
+        cursor = conn.execute("PRAGMA table_info(binned)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "inverter_w" not in columns:
+            conn.execute("ALTER TABLE binned ADD COLUMN inverter_w REAL")
         conn.commit()
 
 
@@ -65,14 +71,15 @@ def upsert_binned(
     l1_w: Optional[float],
     l2_w: Optional[float],
     l3_w: Optional[float],
+    inverter_w: Optional[float],
 ) -> None:
     with sqlite3.connect(db_path) as conn:
         conn.execute(
             """
-            INSERT OR REPLACE INTO binned (ts_local_bin_start, total_w, l1_w, l2_w, l3_w)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO binned (ts_local_bin_start, total_w, l1_w, l2_w, l3_w, inverter_w)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (ts_local_bin_start, total_w, l1_w, l2_w, l3_w),
+            (ts_local_bin_start, total_w, l1_w, l2_w, l3_w, inverter_w),
         )
         conn.commit()
 
@@ -82,7 +89,7 @@ def fetch_binned_since(db_path: str, ts_local_start: str) -> List[Dict[str, Any]
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """
-            SELECT ts_local_bin_start, total_w, l1_w, l2_w, l3_w
+            SELECT ts_local_bin_start, total_w, l1_w, l2_w, l3_w, inverter_w
             FROM binned
             WHERE ts_local_bin_start >= ?
             ORDER BY ts_local_bin_start ASC
@@ -97,7 +104,7 @@ def fetch_binned_between(db_path: str, start_local: str, end_local: str) -> List
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """
-            SELECT ts_local_bin_start, total_w, l1_w, l2_w, l3_w
+            SELECT ts_local_bin_start, total_w, l1_w, l2_w, l3_w, inverter_w
             FROM binned
             WHERE ts_local_bin_start >= ? AND ts_local_bin_start < ?
             ORDER BY ts_local_bin_start ASC

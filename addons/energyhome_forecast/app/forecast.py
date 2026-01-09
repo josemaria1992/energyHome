@@ -44,7 +44,7 @@ def build_forecast(
     timestamps = [start + timedelta(minutes=15 * i) for i in range(steps)]
 
     outputs: Dict[str, List[float]] = {}
-    for signal in ["total_w", "l1_w", "l2_w", "l3_w"]:
+    for signal in ["total_w", "l1_w", "l2_w", "l3_w", "inverter_w"]:
         baseline = compute_baseline(df, signal)
         baseline = smooth_baseline(baseline)
         curve = ilc_curve.get(signal, {})
