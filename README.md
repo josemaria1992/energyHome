@@ -1,7 +1,5 @@
 # energyHome
-## Home Assistant Add-on Repository
 
-This repository includes a minimal Home Assistant add-on scaffold.
 
 ### Add the repository in Home Assistant
 
@@ -13,8 +11,19 @@ This repository includes a minimal Home Assistant add-on scaffold.
 https://github.com/josemaria1992/energyHome
 ```
 
-4. Find **Hello World** in the add-on store and click **Install**.
-5. Start the add-on and open the **Log** tab to see `Hello World` every 30 seconds.
+4. Find **EnergyHome Forecast** in the add-on store and click **Install**.
+5. Configure the add-on, start it, and open the **Ingress** link to view the dashboard.
+
+### How to test
+
+With the add-on running, validate the service endpoints:
+
+```
+curl http://localhost:8080/health
+curl http://localhost:8080/api/forecast
+```
+
+Then open the `/ui` dashboard via ingress in Home Assistant.
 
 ### Local build (optional)
 
