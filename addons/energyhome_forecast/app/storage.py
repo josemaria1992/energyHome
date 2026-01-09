@@ -49,9 +49,7 @@ def init_db(db_path: str) -> None:
         conn.commit()
 
 
-def insert_measurements(
-    db_path: str, rows: Iterable[Tuple[str, str, Optional[float]]]
-) -> None:
+def insert_measurements(db_path: str, rows: Iterable[Tuple[str, str, Optional[float]]]) -> None:
     with sqlite3.connect(db_path) as conn:
         conn.executemany(
             "INSERT OR REPLACE INTO measurements (ts_utc, entity_id, value) VALUES (?, ?, ?)",
@@ -94,9 +92,7 @@ def fetch_binned_since(db_path: str, ts_local_start: str) -> List[Dict[str, Any]
     return [dict(row) for row in rows]
 
 
-def fetch_binned_between(
-    db_path: str, start_local: str, end_local: str
-) -> List[Dict[str, Any]]:
+def fetch_binned_between(db_path: str, start_local: str, end_local: str) -> List[Dict[str, Any]]:
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
@@ -119,9 +115,7 @@ def fetch_points_count(db_path: str) -> int:
 
 def get_metadata(db_path: str, key: str) -> Optional[str]:
     with sqlite3.connect(db_path) as conn:
-        row = conn.execute(
-            "SELECT value FROM metadata WHERE key = ?", (key,)
-        ).fetchone()
+        row = conn.execute("SELECT value FROM metadata WHERE key = ?", (key,)).fetchone()
     return row[0] if row else None
 
 
@@ -147,9 +141,6 @@ def save_ilc_curve(db_path: str, signal: str, curve: Dict[int, float]) -> None:
     with sqlite3.connect(db_path) as conn:
         conn.executemany(
             "INSERT OR REPLACE INTO ilc_curve (signal, bin, value) VALUES (?, ?, ?)",
-            [
-                (signal, int(bin_index), float(value))
-                for bin_index, value in curve.items()
-            ],
+            [(signal, int(bin_index), float(value)) for bin_index, value in curve.items()],
         )
         conn.commit()

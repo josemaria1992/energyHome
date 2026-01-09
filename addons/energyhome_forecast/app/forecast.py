@@ -11,9 +11,7 @@ def _bin_index(timestamp: pd.Timestamp) -> int:
     return int(timestamp.hour * 4 + timestamp.minute / 15)
 
 
-def compute_baseline(
-    df: pd.DataFrame, value_col: str, days: int = 14
-) -> Dict[int, float]:
+def compute_baseline(df: pd.DataFrame, value_col: str, days: int = 14) -> Dict[int, float]:
     if df.empty:
         return {i: 0.0 for i in range(96)}
     df = df.copy()

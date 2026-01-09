@@ -22,9 +22,7 @@ def render_dashboard(
         col=1,
     )
     fig.add_trace(
-        go.Scatter(
-            x=forecast_times, y=forecast.get("total_w", []), name="Total Forecast"
-        ),
+        go.Scatter(x=forecast_times, y=forecast.get("total_w", []), name="Total Forecast"),
         row=1,
         col=1,
     )

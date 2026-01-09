@@ -12,10 +12,7 @@ logger = logging.getLogger("energyhome")
 class HAClient:
     def __init__(self, ha_url: str, token: str) -> None:
         self.ha_url = ha_url.rstrip("/")
-        self.headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        }
+        self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         self.client = httpx.AsyncClient(timeout=10.0)
 
     async def close(self) -> None:
@@ -41,7 +38,5 @@ class HAClient:
             except (httpx.RequestError, httpx.HTTPStatusError) as exc:
                 if attempt == 4:
                     raise
-                logger.warning(
-                    "HA request failed for %s (attempt %s): %s", entity_id, attempt, exc
-                )
+                logger.warning("HA request failed for %s (attempt %s): %s", entity_id, attempt, exc)
                 continue

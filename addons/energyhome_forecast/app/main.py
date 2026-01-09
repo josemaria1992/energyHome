@@ -35,7 +35,6 @@ app = FastAPI()
 config: AppConfig = load_config()
 ha_client: HAClient | None = None
 
-
 def _now_utc() -> datetime:
     return datetime.now(tz=ZoneInfo("UTC"))
 
@@ -135,12 +134,7 @@ async def maybe_update_ilc(bin_start: datetime) -> None:
         return
 
     baseline_df = df[df["ts_local"].dt.date < today]
-    for signal, cmax in {
-        "total_w": 4000.0,
-        "l1_w": 2000.0,
-        "l2_w": 2000.0,
-        "l3_w": 2000.0,
-    }.items():
+    for signal, cmax in {"total_w": 4000.0, "l1_w": 2000.0, "l2_w": 2000.0, "l3_w": 2000.0}.items():
         baseline = forecast_module.compute_baseline(baseline_df, signal)
         baseline = forecast_module.smooth_baseline(baseline)
         existing_curve = fetch_ilc_curve(config.db_path, signal)
@@ -184,9 +178,7 @@ def build_forecast_payload() -> Dict[str, List]:
         "l2_w": fetch_ilc_curve(config.db_path, "l2_w"),
         "l3_w": fetch_ilc_curve(config.db_path, "l3_w"),
     }
-    timestamps, values = forecast_module.build_forecast(
-        df, config.horizon_hours, curves
-    )
+    timestamps, values = forecast_module.build_forecast(df, config.horizon_hours, curves)
     return {"timestamps": timestamps, **values}
 
 
