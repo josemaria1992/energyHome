@@ -184,22 +184,35 @@ def render_dashboard(
     # JavaScript functions
     javascript = """
     <script>
+    // API helper function for consistent error handling
+    async function apiGet(path) {
+        const resp = await fetch('./api/' + path);
+        const text = await resp.text();
+        if (!resp.ok) {
+            throw new Error('HTTP ' + resp.status + ': ' + text);
+        }
+        return text ? JSON.parse(text) : {};
+    }
+
+    async function apiPost(path) {
+        const resp = await fetch('./api/' + path, { method: 'POST' });
+        const text = await resp.text();
+        if (!resp.ok) {
+            throw new Error('HTTP ' + resp.status + ': ' + text);
+        }
+        return text ? JSON.parse(text) : {};
+    }
+
     // Fetch and display live readings on page load
     async function loadLiveReadings() {
-        const resp = await fetch('./api/latest');
-        const text = await resp.text();
-
         try {
-            const data = JSON.parse(text);
+            const data = await apiGet('latest');
             renderLiveReadings(data);
         } catch (e) {
             const errBox = document.getElementById('liveError');
             errBox.style.display = 'block';
             errBox.textContent =
-                '⚠️ Live readings endpoint did not return JSON. HTTP ' +
-                resp.status +
-                '. Response (first 200 chars): ' +
-                text.slice(0, 200);
+                '⚠️ Failed to load live readings: ' + e.message;
             document.getElementById('loadingIndicator').style.display = 'none';
             throw e;
         }
@@ -318,43 +331,31 @@ def render_dashboard(
 
     async function pollNow() {
         try {
-            const res = await fetch('./api/poll_now', {method: 'POST'});
-            if (res.ok) {
-                alert('✅ Poll completed successfully! Reloading page...');
-                location.reload();
-            } else {
-                alert('❌ Poll failed: ' + await res.text());
-            }
+            await apiPost('poll_now');
+            alert('✅ Poll completed successfully! Reloading page...');
+            location.reload();
         } catch (err) {
-            alert('❌ Error: ' + err.message);
+            alert('❌ Poll failed: ' + err.message);
         }
     }
 
     async function updateILC() {
         try {
-            const res = await fetch('./api/ilc/update', {method: 'POST'});
-            if (res.ok) {
-                alert('✅ ILC update completed! Reloading page...');
-                location.reload();
-            } else {
-                alert('❌ ILC update failed: ' + await res.text());
-            }
+            await apiPost('ilc/update');
+            alert('✅ ILC update completed! Reloading page...');
+            location.reload();
         } catch (err) {
-            alert('❌ Error: ' + err.message);
+            alert('❌ ILC update failed: ' + err.message);
         }
     }
 
     async function refreshForecast() {
         try {
-            const res = await fetch('./api/recompute', {method: 'POST'});
-            if (res.ok) {
-                alert('✅ Forecast refreshed! Reloading page...');
-                location.reload();
-            } else {
-                alert('❌ Refresh failed: ' + await res.text());
-            }
+            await apiPost('recompute');
+            alert('✅ Forecast refreshed! Reloading page...');
+            location.reload();
         } catch (err) {
-            alert('❌ Error: ' + err.message);
+            alert('❌ Refresh failed: ' + err.message);
         }
     }
 
