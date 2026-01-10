@@ -7,7 +7,7 @@ from typing import Dict, List
 
 import pandas as pd
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from zoneinfo import ZoneInfo
 
 import forecast as forecast_module
@@ -275,41 +275,48 @@ async def forecast() -> Dict[str, List]:
 
 
 @app.get("/api/latest")
-async def latest() -> Dict[str, object]:
+async def latest():
     """Get the latest raw measurements from the most recent poll."""
-    raw = fetch_latest_measurements(config.db_path)
-    ts_utc = raw.get("ts_utc")
-    values = raw.get("values", {})
+    try:
+        raw = fetch_latest_measurements(config.db_path)
+        ts_utc = raw.get("ts_utc")
+        values = raw.get("values", {})
+    except Exception as exc:
+        logger.exception("fetch_latest_measurements failed")
+        return JSONResponse(
+            content={
+                "ts_utc": None,
+                "signals": {},
+                "error": str(exc)
+            },
+            media_type="application/json"
+        )
 
-    # Map entity IDs to friendly signal names
     entities = config.entities
     signals = {}
 
-    # Helper to safely get value
-    def get_val(entity_id: str | None) -> float | None:
+    def get_val(entity_id):
         if entity_id and entity_id in values:
-            return values[entity_id]
+            v = values[entity_id]
+            try:
+                return float(v)
+            except Exception:
+                return None
         return None
 
-    # Total load
     signals["total_w"] = get_val(entities.total_load_power)
-
-    # Phase loads
     signals["l1_w"] = get_val(entities.l1_load_power)
     signals["l2_w"] = get_val(entities.l2_load_power)
     signals["l3_w"] = get_val(entities.l3_load_power)
 
-    # Grid currents
     signals["grid_l1_a"] = get_val(entities.grid_l1_current)
     signals["grid_l2_a"] = get_val(entities.grid_l2_current)
     signals["grid_l3_a"] = get_val(entities.grid_l3_current)
 
-    # Grid powers
     grid_l1_w = get_val(entities.grid_l1_power)
     grid_l2_w = get_val(entities.grid_l2_power)
     grid_l3_w = get_val(entities.grid_l3_power)
 
-    # If grid power not available but current is, compute estimated power
     if grid_l1_w is None and signals["grid_l1_a"] is not None:
         grid_l1_w = signals["grid_l1_a"] * config.grid_voltage_v
         signals["grid_l1_w_estimated"] = True
@@ -332,16 +339,16 @@ async def latest() -> Dict[str, object]:
     signals["grid_l2_w"] = grid_l2_w
     signals["grid_l3_w"] = grid_l3_w
 
-    # Inverter load
     signals["inverter_w"] = get_val(entities.inverter_load_power)
-
-    # SOC
     signals["soc_pct"] = get_val(entities.soc)
 
-    return {
-        "ts_utc": ts_utc,
-        "signals": signals,
-    }
+    return JSONResponse(
+        content={
+            "ts_utc": ts_utc,
+            "signals": signals
+        },
+        media_type="application/json"
+    )
 
 
 @app.post("/api/recompute")

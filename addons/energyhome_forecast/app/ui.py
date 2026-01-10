@@ -148,6 +148,7 @@ def render_dashboard(
     live_readings = """
     <div class="card live-readings" id="liveReadings">
         <h2 class="section-title">📡 Live Readings</h2>
+        <div class="warning-banner" id="liveError" style="display: none;"></div>
         <div class="loading" id="loadingIndicator">Loading latest sensor values...</div>
         <div class="readings-grid" id="readingsGrid" style="display: none;">
             <!-- Populated by JavaScript -->
@@ -185,128 +186,139 @@ def render_dashboard(
     <script>
     // Fetch and display live readings on page load
     async function loadLiveReadings() {
+        const resp = await fetch('./api/latest');
+        const text = await resp.text();
+
         try {
-            const res = await fetch('/api/latest');
-            const data = await res.json();
-
+            const data = JSON.parse(text);
+            renderLiveReadings(data);
+        } catch (e) {
+            const errBox = document.getElementById('liveError');
+            errBox.style.display = 'block';
+            errBox.textContent =
+                '⚠️ Live readings endpoint did not return JSON. HTTP ' +
+                resp.status +
+                '. Response (first 200 chars): ' +
+                text.slice(0, 200);
             document.getElementById('loadingIndicator').style.display = 'none';
-            document.getElementById('readingsGrid').style.display = 'grid';
-
-            const signals = data.signals || {};
-            const gridHtml = [];
-
-            // Helper to format value
-            function fmt(val, unit, estimated = false) {
-                if (val === null || val === undefined) {
-                    return '<span class="value-missing">—</span>';
-                }
-                const estLabel = estimated ? ' <span class="estimated">(est.)</span>' : '';
-                return `<span class="value-present">${val.toFixed(1)} ${unit}</span>${estLabel}`;
-            }
-
-            // Total load
-            gridHtml.push(`
-                <div class="reading-item">
-                    <div class="reading-label">Total Load</div>
-                    <div class="reading-value">${fmt(signals.total_w, 'W')}</div>
-                </div>
-            `);
-
-            // Phase loads
-            gridHtml.push(`
-                <div class="reading-item">
-                    <div class="reading-label">L1 Load</div>
-                    <div class="reading-value">${fmt(signals.l1_w, 'W')}</div>
-                </div>
-            `);
-            gridHtml.push(`
-                <div class="reading-item">
-                    <div class="reading-label">L2 Load</div>
-                    <div class="reading-value">${fmt(signals.l2_w, 'W')}</div>
-                </div>
-            `);
-            gridHtml.push(`
-                <div class="reading-item">
-                    <div class="reading-label">L3 Load</div>
-                    <div class="reading-value">${fmt(signals.l3_w, 'W')}</div>
-                </div>
-            `);
-
-            // Grid currents (if available)
-            if (signals.grid_l1_a !== null || signals.grid_l2_a !== null || signals.grid_l3_a !== null) {
-                gridHtml.push(`
-                    <div class="reading-item">
-                        <div class="reading-label">Grid L1 Current</div>
-                        <div class="reading-value">${fmt(signals.grid_l1_a, 'A')}</div>
-                    </div>
-                `);
-                gridHtml.push(`
-                    <div class="reading-item">
-                        <div class="reading-label">Grid L2 Current</div>
-                        <div class="reading-value">${fmt(signals.grid_l2_a, 'A')}</div>
-                    </div>
-                `);
-                gridHtml.push(`
-                    <div class="reading-item">
-                        <div class="reading-label">Grid L3 Current</div>
-                        <div class="reading-value">${fmt(signals.grid_l3_a, 'A')}</div>
-                    </div>
-                `);
-            }
-
-            // Grid powers
-            if (signals.grid_l1_w !== null || signals.grid_l2_w !== null || signals.grid_l3_w !== null) {
-                gridHtml.push(`
-                    <div class="reading-item">
-                        <div class="reading-label">Grid L1 Power</div>
-                        <div class="reading-value">${fmt(signals.grid_l1_w, 'W', signals.grid_l1_w_estimated)}</div>
-                    </div>
-                `);
-                gridHtml.push(`
-                    <div class="reading-item">
-                        <div class="reading-label">Grid L2 Power</div>
-                        <div class="reading-value">${fmt(signals.grid_l2_w, 'W', signals.grid_l2_w_estimated)}</div>
-                    </div>
-                `);
-                gridHtml.push(`
-                    <div class="reading-item">
-                        <div class="reading-label">Grid L3 Power</div>
-                        <div class="reading-value">${fmt(signals.grid_l3_w, 'W', signals.grid_l3_w_estimated)}</div>
-                    </div>
-                `);
-            }
-
-            // Inverter load (if configured)
-            if (signals.inverter_w !== null) {
-                gridHtml.push(`
-                    <div class="reading-item">
-                        <div class="reading-label">Inverter Load</div>
-                        <div class="reading-value">${fmt(signals.inverter_w, 'W')}</div>
-                    </div>
-                `);
-            }
-
-            // SOC (if configured)
-            if (signals.soc_pct !== null) {
-                gridHtml.push(`
-                    <div class="reading-item">
-                        <div class="reading-label">Battery SOC</div>
-                        <div class="reading-value">${fmt(signals.soc_pct, '%')}</div>
-                    </div>
-                `);
-            }
-
-            document.getElementById('readingsGrid').innerHTML = gridHtml.join('');
-
-        } catch (err) {
-            document.getElementById('loadingIndicator').innerHTML =
-                '<span style="color: #ef4444;">⚠️ Failed to load live readings: ' + err.message + '</span>';
+            throw e;
         }
+    }
+
+    function renderLiveReadings(data) {
+        document.getElementById('loadingIndicator').style.display = 'none';
+        document.getElementById('readingsGrid').style.display = 'grid';
+
+        const signals = data.signals || {};
+        const gridHtml = [];
+
+        // Helper to format value
+        function fmt(val, unit, estimated = false) {
+            if (val === null || val === undefined) {
+                return '<span class="value-missing">—</span>';
+            }
+            const estLabel = estimated ? ' <span class="estimated">(est.)</span>' : '';
+            return `<span class="value-present">${val.toFixed(1)} ${unit}</span>${estLabel}`;
+        }
+
+        // Total load
+        gridHtml.push(`
+            <div class="reading-item">
+                <div class="reading-label">Total Load</div>
+                <div class="reading-value">${fmt(signals.total_w, 'W')}</div>
+            </div>
+        `);
+
+        // Phase loads
+        gridHtml.push(`
+            <div class="reading-item">
+                <div class="reading-label">L1 Load</div>
+                <div class="reading-value">${fmt(signals.l1_w, 'W')}</div>
+            </div>
+        `);
+        gridHtml.push(`
+            <div class="reading-item">
+                <div class="reading-label">L2 Load</div>
+                <div class="reading-value">${fmt(signals.l2_w, 'W')}</div>
+            </div>
+        `);
+        gridHtml.push(`
+            <div class="reading-item">
+                <div class="reading-label">L3 Load</div>
+                <div class="reading-value">${fmt(signals.l3_w, 'W')}</div>
+            </div>
+        `);
+
+        // Grid currents (if available)
+        if (signals.grid_l1_a !== null || signals.grid_l2_a !== null || signals.grid_l3_a !== null) {
+            gridHtml.push(`
+                <div class="reading-item">
+                    <div class="reading-label">Grid L1 Current</div>
+                    <div class="reading-value">${fmt(signals.grid_l1_a, 'A')}</div>
+                </div>
+            `);
+            gridHtml.push(`
+                <div class="reading-item">
+                    <div class="reading-label">Grid L2 Current</div>
+                    <div class="reading-value">${fmt(signals.grid_l2_a, 'A')}</div>
+                </div>
+            `);
+            gridHtml.push(`
+                <div class="reading-item">
+                    <div class="reading-label">Grid L3 Current</div>
+                    <div class="reading-value">${fmt(signals.grid_l3_a, 'A')}</div>
+                </div>
+            `);
+        }
+
+        // Grid powers
+        if (signals.grid_l1_w !== null || signals.grid_l2_w !== null || signals.grid_l3_w !== null) {
+            gridHtml.push(`
+                <div class="reading-item">
+                    <div class="reading-label">Grid L1 Power</div>
+                    <div class="reading-value">${fmt(signals.grid_l1_w, 'W', signals.grid_l1_w_estimated)}</div>
+                </div>
+            `);
+            gridHtml.push(`
+                <div class="reading-item">
+                    <div class="reading-label">Grid L2 Power</div>
+                    <div class="reading-value">${fmt(signals.grid_l2_w, 'W', signals.grid_l2_w_estimated)}</div>
+                </div>
+            `);
+            gridHtml.push(`
+                <div class="reading-item">
+                    <div class="reading-label">Grid L3 Power</div>
+                    <div class="reading-value">${fmt(signals.grid_l3_w, 'W', signals.grid_l3_w_estimated)}</div>
+                </div>
+            `);
+        }
+
+        // Inverter load (if configured)
+        if (signals.inverter_w !== null) {
+            gridHtml.push(`
+                <div class="reading-item">
+                    <div class="reading-label">Inverter Load</div>
+                    <div class="reading-value">${fmt(signals.inverter_w, 'W')}</div>
+                </div>
+            `);
+        }
+
+        // SOC (if configured)
+        if (signals.soc_pct !== null) {
+            gridHtml.push(`
+                <div class="reading-item">
+                    <div class="reading-label">Battery SOC</div>
+                    <div class="reading-value">${fmt(signals.soc_pct, '%')}</div>
+                </div>
+            `);
+        }
+
+        document.getElementById('readingsGrid').innerHTML = gridHtml.join('');
     }
 
     async function pollNow() {
         try {
-            const res = await fetch('/api/poll_now', {method: 'POST'});
+            const res = await fetch('./api/poll_now', {method: 'POST'});
             if (res.ok) {
                 alert('✅ Poll completed successfully! Reloading page...');
                 location.reload();
@@ -320,7 +332,7 @@ def render_dashboard(
 
     async function updateILC() {
         try {
-            const res = await fetch('/api/ilc/update', {method: 'POST'});
+            const res = await fetch('./api/ilc/update', {method: 'POST'});
             if (res.ok) {
                 alert('✅ ILC update completed! Reloading page...');
                 location.reload();
@@ -334,7 +346,7 @@ def render_dashboard(
 
     async function refreshForecast() {
         try {
-            const res = await fetch('/api/recompute', {method: 'POST'});
+            const res = await fetch('./api/recompute', {method: 'POST'});
             if (res.ok) {
                 alert('✅ Forecast refreshed! Reloading page...');
                 location.reload();
