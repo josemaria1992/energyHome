@@ -7,7 +7,7 @@ from typing import Dict, List
 
 import pandas as pd
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from zoneinfo import ZoneInfo
 
 import forecast as forecast_module
@@ -232,6 +232,11 @@ def build_forecast_payload() -> Dict[str, List]:
 @app.on_event("startup")
 async def startup_event() -> None:
     global ha_client
+    logger.info("EnergyHome Forecast v0.3.0 starting...")
+    logger.info("Database path: %s", config.db_path)
+    logger.info("Polling interval: %d minutes", config.poll_interval_minutes)
+    logger.info("Timezone: %s", config.timezone)
+    logger.info("Forecast horizon: %d hours", config.horizon_hours)
     init_db(config.db_path)
     ha_client = HAClient(config.ha_url, config.ha_token)
     # Validate auth before starting poll loop to prevent endless log spam
@@ -374,6 +379,24 @@ async def poll_now() -> Dict[str, str]:
     except Exception as exc:
         logger.exception("Manual poll failed: %s", exc)
         return {"status": "error", "message": str(exc)}
+
+
+@app.get("/api/export_db")
+async def export_db():
+    """Export/download the database file for backup purposes."""
+    import os
+    if not os.path.exists(config.db_path):
+        return JSONResponse(
+            content={"error": "Database file not found"},
+            status_code=404
+        )
+
+    logger.info("Database export requested")
+    return FileResponse(
+        path=config.db_path,
+        media_type="application/x-sqlite3",
+        filename="energyhome_backup.sqlite"
+    )
 
 
 @app.get("/ui", response_class=HTMLResponse)

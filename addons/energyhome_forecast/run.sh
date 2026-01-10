@@ -1,7 +1,7 @@
 #!/usr/bin/with-contenv bashio
 set -euo pipefail
 
-bashio::log.info "Starting EnergyHome Forecast add-on v0.2.0"
+bashio::log.info "Starting EnergyHome Forecast add-on v0.3.0"
 
 export HA_URL
 HA_URL="$(bashio::config 'ha_url')"

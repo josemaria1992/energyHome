@@ -1,6 +1,10 @@
 ARG BUILD_FROM
 FROM $BUILD_FROM
 
+# Cache-buster: change this value to force rebuild
+ARG CACHEBUST=1
+RUN echo "Build cache-bust: ${CACHEBUST}"
+
 RUN apk add --no-cache python3 py3-pip
 
 WORKDIR /app
