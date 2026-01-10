@@ -17,7 +17,8 @@ panel_icon: mdi:chart-line
 options:
   ha_url: http://supervisor/core
   ha_token: ""
-  poll_interval_minutes: 15
+  poll_interval_seconds: 5
+  bin_minutes: 1
   timezone: Europe/Stockholm
   horizon_hours: 48
   entities:
@@ -26,9 +27,9 @@ options:
     l2_load_power: sensor.inverter_load_l2_power
     l3_load_power: sensor.inverter_load_l3_power
     soc: sensor.inverter_battery
-    grid_l1_current: ""
-    grid_l2_current: ""
-    grid_l3_current: ""
+    grid_l1_current: sensor.inverter_external_ct1_current
+    grid_l2_current: sensor.inverter_external_ct2_current
+    grid_l3_current: sensor.inverter_external_ct3_current
     grid_l1_power: sensor.inverter_grid_l1_power
     grid_l2_power: sensor.inverter_grid_l2_power
     grid_l3_power: sensor.inverter_grid_l3_power
@@ -37,7 +38,8 @@ options:
 schema:
   ha_url: str?
   ha_token: password?
-  poll_interval_minutes: int(1,60)
+  poll_interval_seconds: int(1,60)
+  bin_minutes: int(1,60)
   timezone: str
   horizon_hours: int
   entities:

@@ -147,7 +147,10 @@ def render_dashboard(
     # Live readings panel (populated by JavaScript)
     live_readings = """
     <div class="card live-readings" id="liveReadings">
-        <h2 class="section-title">📡 Live Readings</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2 class="section-title" style="margin: 0;">📡 Live Readings</h2>
+            <div id="lastUpdated" style="font-size: 12px; color: #94a3b8;"></div>
+        </div>
         <div class="warning-banner" id="liveError" style="display: none;"></div>
         <div class="loading" id="loadingIndicator">Loading latest sensor values...</div>
         <div class="readings-grid" id="readingsGrid" style="display: none;">
@@ -167,7 +170,7 @@ def render_dashboard(
         <div class="actions-help">
             <div class="help-item">
                 <strong>📊 Poll now:</strong> Immediately fetch the latest sensor values from Home Assistant and store them in the database.
-                Use this to verify sensor readings or to force an update outside the normal 15-minute polling cycle.
+                Use this to verify sensor readings or to force an update outside the normal polling cycle.
             </div>
             <div class="help-item">
                 <strong>🎓 Update learning (ILC):</strong> Recalculate the Iterative Learning Control correction curves from historical forecast errors.
@@ -208,6 +211,10 @@ def render_dashboard(
         try {
             const data = await apiGet('latest');
             renderLiveReadings(data);
+            // Update "Last updated" timestamp
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString();
+            document.getElementById('lastUpdated').textContent = 'Last updated: ' + timeStr;
         } catch (e) {
             const errBox = document.getElementById('liveError');
             errBox.style.display = 'block';
@@ -359,8 +366,12 @@ def render_dashboard(
         }
     }
 
-    // Load live readings when page loads
-    window.addEventListener('DOMContentLoaded', loadLiveReadings);
+    // Load live readings when page loads and set up auto-refresh
+    window.addEventListener('DOMContentLoaded', function() {
+        loadLiveReadings();
+        // Auto-refresh live readings every 5 seconds
+        setInterval(loadLiveReadings, 5000);
+    });
     </script>
     """
 

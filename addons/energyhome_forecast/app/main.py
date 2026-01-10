@@ -46,7 +46,7 @@ def _local_tz() -> ZoneInfo:
 
 def _local_bin_start(ts_utc: datetime) -> datetime:
     local_ts = ts_utc.astimezone(_local_tz())
-    minute = (local_ts.minute // 15) * 15
+    minute = (local_ts.minute // config.bin_minutes) * config.bin_minutes
     return local_ts.replace(minute=minute, second=0, microsecond=0)
 
 
@@ -130,12 +130,12 @@ async def poll_once() -> None:
     await maybe_update_ilc(bin_start)
 
     # Log poll completion summary
-    next_poll = _now_utc() + timedelta(minutes=config.poll_interval_minutes)
+    next_poll = _now_utc() + timedelta(seconds=config.poll_interval_seconds)
     logger.info(
-        "Poll complete: inserted=%d measurements, bin=%s, next_poll_in=%d min (at %s UTC)",
+        "Poll complete: inserted=%d measurements, bin=%s, next_poll_in=%d sec (at %s UTC)",
         len(measurements),
         bin_start.isoformat(),
-        config.poll_interval_minutes,
+        config.poll_interval_seconds,
         next_poll.strftime("%H:%M:%S"),
     )
 
@@ -149,9 +149,9 @@ async def poll_loop() -> None:
                 first_poll = False
         except Exception as exc:  # noqa: BLE001
             logger.exception("Polling failed: %s", exc)
-        next_poll = _now_utc() + timedelta(minutes=config.poll_interval_minutes)
-        logger.info("Next poll scheduled in %d minutes (at %s UTC)", config.poll_interval_minutes, next_poll.strftime("%H:%M:%S"))
-        await asyncio.sleep(config.poll_interval_minutes * 60)
+        next_poll = _now_utc() + timedelta(seconds=config.poll_interval_seconds)
+        logger.info("Next poll scheduled in %d seconds (at %s UTC)", config.poll_interval_seconds, next_poll.strftime("%H:%M:%S"))
+        await asyncio.sleep(config.poll_interval_seconds)
 
 
 async def maybe_update_ilc(bin_start: datetime) -> None:
@@ -234,7 +234,7 @@ async def startup_event() -> None:
     global ha_client
     logger.info("EnergyHome Forecast v0.3.0 starting...")
     logger.info("Database path: %s", config.db_path)
-    logger.info("Polling interval: %d minutes", config.poll_interval_minutes)
+    logger.info("Polling interval: %d seconds (bin size: %d minutes)", config.poll_interval_seconds, config.bin_minutes)
     logger.info("Timezone: %s", config.timezone)
     logger.info("Forecast horizon: %d hours", config.horizon_hours)
     init_db(config.db_path)

@@ -13,8 +13,10 @@ HA_TOKEN="$(bashio::config 'ha_token')"
 if [ -z "${HA_TOKEN}" ] || [ "${HA_TOKEN}" = "null" ]; then
   HA_TOKEN="${SUPERVISOR_TOKEN:-}"
 fi
-export POLL_INTERVAL_MINUTES
-POLL_INTERVAL_MINUTES="$(bashio::config 'poll_interval_minutes')"
+export POLL_INTERVAL_SECONDS
+POLL_INTERVAL_SECONDS="$(bashio::config 'poll_interval_seconds')"
+export BIN_MINUTES
+BIN_MINUTES="$(bashio::config 'bin_minutes')"
 export TIMEZONE
 TIMEZONE="$(bashio::config 'timezone')"
 export HORIZON_HOURS

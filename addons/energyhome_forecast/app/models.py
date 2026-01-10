@@ -28,7 +28,8 @@ class EntityConfig:
 class AppConfig:
     ha_url: str
     ha_token: str
-    poll_interval_minutes: int
+    poll_interval_seconds: int
+    bin_minutes: int
     timezone: str
     horizon_hours: int
     entities: EntityConfig
@@ -87,7 +88,8 @@ def load_config() -> AppConfig:
     return AppConfig(
         ha_url=base_url,
         ha_token=token,
-        poll_interval_minutes=int(os.environ.get("POLL_INTERVAL_MINUTES", "15")),
+        poll_interval_seconds=int(os.environ.get("POLL_INTERVAL_SECONDS", "5")),
+        bin_minutes=int(os.environ.get("BIN_MINUTES", "1")),
         timezone=os.environ.get("TIMEZONE", "Europe/Stockholm"),
         horizon_hours=int(os.environ.get("HORIZON_HOURS", "48")),
         entities=EntityConfig(
