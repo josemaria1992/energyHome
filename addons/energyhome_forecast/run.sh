@@ -35,6 +35,16 @@ export ENTITY_GRID_L2_CURRENT
 ENTITY_GRID_L2_CURRENT="$(bashio::config 'entities.grid_l2_current')"
 export ENTITY_GRID_L3_CURRENT
 ENTITY_GRID_L3_CURRENT="$(bashio::config 'entities.grid_l3_current')"
+export ENTITY_GRID_L1_POWER
+ENTITY_GRID_L1_POWER="$(bashio::config 'entities.grid_l1_power')"
+export ENTITY_GRID_L2_POWER
+ENTITY_GRID_L2_POWER="$(bashio::config 'entities.grid_l2_power')"
+export ENTITY_GRID_L3_POWER
+ENTITY_GRID_L3_POWER="$(bashio::config 'entities.grid_l3_power')"
+export ENTITY_INVERTER_LOAD_POWER
+ENTITY_INVERTER_LOAD_POWER="$(bashio::config 'entities.inverter_load_power')"
+export GRID_VOLTAGE_V
+GRID_VOLTAGE_V="$(bashio::config 'grid_voltage_v')"
 export DB_PATH
 DB_PATH="/data/energyhome.sqlite"
 if [ -f "${DB_PATH}" ]; then

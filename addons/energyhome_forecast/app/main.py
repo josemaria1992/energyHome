@@ -18,6 +18,7 @@ from storage import (
     fetch_binned_between,
     fetch_binned_since,
     fetch_ilc_curve,
+    fetch_latest_measurements,
     fetch_points_count,
     get_metadata,
     init_db,
@@ -51,7 +52,7 @@ def _local_bin_start(ts_utc: datetime) -> datetime:
 
 def _dataframe_from_rows(rows: List[Dict[str, object]]) -> pd.DataFrame:
     if not rows:
-        return pd.DataFrame(columns=["ts_local", "total_w", "l1_w", "l2_w", "l3_w", "inverter_w"])
+        return pd.DataFrame(columns=["ts_local", "total_w", "l1_w", "l2_w", "l3_w", "grid_l1_w", "grid_l2_w", "grid_l3_w", "inverter_w"])
     df = pd.DataFrame(rows)
     df["ts_local"] = pd.to_datetime(df["ts_local_bin_start"], utc=False)
     return df
@@ -72,6 +73,9 @@ async def poll_once() -> None:
         "grid_l1_current": entities.grid_l1_current,
         "grid_l2_current": entities.grid_l2_current,
         "grid_l3_current": entities.grid_l3_current,
+        "grid_l1_power": entities.grid_l1_power,
+        "grid_l2_power": entities.grid_l2_power,
+        "grid_l3_power": entities.grid_l3_power,
     }
 
     results: Dict[str, float | None] = {}
@@ -96,6 +100,18 @@ async def poll_once() -> None:
         measurements.append((ts_utc.isoformat(), entity_id, results.get(key)))
     insert_measurements(config.db_path, measurements)
 
+    # Compute grid power from current if power sensors not available
+    grid_l1_w = results.get("grid_l1_power")
+    grid_l2_w = results.get("grid_l2_power")
+    grid_l3_w = results.get("grid_l3_power")
+
+    if grid_l1_w is None and results.get("grid_l1_current") is not None:
+        grid_l1_w = results["grid_l1_current"] * config.grid_voltage_v
+    if grid_l2_w is None and results.get("grid_l2_current") is not None:
+        grid_l2_w = results["grid_l2_current"] * config.grid_voltage_v
+    if grid_l3_w is None and results.get("grid_l3_current") is not None:
+        grid_l3_w = results["grid_l3_current"] * config.grid_voltage_v
+
     bin_start = _local_bin_start(ts_utc)
     upsert_binned(
         config.db_path,
@@ -104,6 +120,9 @@ async def poll_once() -> None:
         results.get("l1_w"),
         results.get("l2_w"),
         results.get("l3_w"),
+        grid_l1_w,
+        grid_l2_w,
+        grid_l3_w,
         results.get("inverter_w"),
     )
 
@@ -187,6 +206,9 @@ def build_history(hours: int) -> Dict[str, List]:
         "l1_w": df.get("l1_w", pd.Series(dtype=float)).tolist(),
         "l2_w": df.get("l2_w", pd.Series(dtype=float)).tolist(),
         "l3_w": df.get("l3_w", pd.Series(dtype=float)).tolist(),
+        "grid_l1_w": df.get("grid_l1_w", pd.Series(dtype=float)).tolist(),
+        "grid_l2_w": df.get("grid_l2_w", pd.Series(dtype=float)).tolist(),
+        "grid_l3_w": df.get("grid_l3_w", pd.Series(dtype=float)).tolist(),
         "inverter_w": df.get("inverter_w", pd.Series(dtype=float)).tolist(),
     }
 
@@ -250,6 +272,76 @@ async def history(hours: int = 72) -> Dict[str, List]:
 @app.get("/api/forecast")
 async def forecast() -> Dict[str, List]:
     return build_forecast_payload()
+
+
+@app.get("/api/latest")
+async def latest() -> Dict[str, object]:
+    """Get the latest raw measurements from the most recent poll."""
+    raw = fetch_latest_measurements(config.db_path)
+    ts_utc = raw.get("ts_utc")
+    values = raw.get("values", {})
+
+    # Map entity IDs to friendly signal names
+    entities = config.entities
+    signals = {}
+
+    # Helper to safely get value
+    def get_val(entity_id: str | None) -> float | None:
+        if entity_id and entity_id in values:
+            return values[entity_id]
+        return None
+
+    # Total load
+    signals["total_w"] = get_val(entities.total_load_power)
+
+    # Phase loads
+    signals["l1_w"] = get_val(entities.l1_load_power)
+    signals["l2_w"] = get_val(entities.l2_load_power)
+    signals["l3_w"] = get_val(entities.l3_load_power)
+
+    # Grid currents
+    signals["grid_l1_a"] = get_val(entities.grid_l1_current)
+    signals["grid_l2_a"] = get_val(entities.grid_l2_current)
+    signals["grid_l3_a"] = get_val(entities.grid_l3_current)
+
+    # Grid powers
+    grid_l1_w = get_val(entities.grid_l1_power)
+    grid_l2_w = get_val(entities.grid_l2_power)
+    grid_l3_w = get_val(entities.grid_l3_power)
+
+    # If grid power not available but current is, compute estimated power
+    if grid_l1_w is None and signals["grid_l1_a"] is not None:
+        grid_l1_w = signals["grid_l1_a"] * config.grid_voltage_v
+        signals["grid_l1_w_estimated"] = True
+    else:
+        signals["grid_l1_w_estimated"] = False
+
+    if grid_l2_w is None and signals["grid_l2_a"] is not None:
+        grid_l2_w = signals["grid_l2_a"] * config.grid_voltage_v
+        signals["grid_l2_w_estimated"] = True
+    else:
+        signals["grid_l2_w_estimated"] = False
+
+    if grid_l3_w is None and signals["grid_l3_a"] is not None:
+        grid_l3_w = signals["grid_l3_a"] * config.grid_voltage_v
+        signals["grid_l3_w_estimated"] = True
+    else:
+        signals["grid_l3_w_estimated"] = False
+
+    signals["grid_l1_w"] = grid_l1_w
+    signals["grid_l2_w"] = grid_l2_w
+    signals["grid_l3_w"] = grid_l3_w
+
+    # Inverter load
+    signals["inverter_w"] = get_val(entities.inverter_load_power)
+
+    # SOC
+    signals["soc_pct"] = get_val(entities.soc)
+
+    return {
+        "ts_utc": ts_utc,
+        "signals": signals,
+    }
 
 
 @app.post("/api/recompute")

@@ -25,6 +25,9 @@ def init_db(db_path: str) -> None:
                 l1_w REAL,
                 l2_w REAL,
                 l3_w REAL,
+                grid_l1_w REAL,
+                grid_l2_w REAL,
+                grid_l3_w REAL,
                 inverter_w REAL
             )
             """
@@ -47,11 +50,17 @@ def init_db(db_path: str) -> None:
             )
             """
         )
-        # Migration: Add inverter_w column for existing databases
+        # Migration: Add new columns for existing databases
         cursor = conn.execute("PRAGMA table_info(binned)")
         columns = [row[1] for row in cursor.fetchall()]
         if "inverter_w" not in columns:
             conn.execute("ALTER TABLE binned ADD COLUMN inverter_w REAL")
+        if "grid_l1_w" not in columns:
+            conn.execute("ALTER TABLE binned ADD COLUMN grid_l1_w REAL")
+        if "grid_l2_w" not in columns:
+            conn.execute("ALTER TABLE binned ADD COLUMN grid_l2_w REAL")
+        if "grid_l3_w" not in columns:
+            conn.execute("ALTER TABLE binned ADD COLUMN grid_l3_w REAL")
         conn.commit()
 
 
@@ -71,15 +80,18 @@ def upsert_binned(
     l1_w: Optional[float],
     l2_w: Optional[float],
     l3_w: Optional[float],
+    grid_l1_w: Optional[float],
+    grid_l2_w: Optional[float],
+    grid_l3_w: Optional[float],
     inverter_w: Optional[float],
 ) -> None:
     with sqlite3.connect(db_path) as conn:
         conn.execute(
             """
-            INSERT OR REPLACE INTO binned (ts_local_bin_start, total_w, l1_w, l2_w, l3_w, inverter_w)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO binned (ts_local_bin_start, total_w, l1_w, l2_w, l3_w, grid_l1_w, grid_l2_w, grid_l3_w, inverter_w)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (ts_local_bin_start, total_w, l1_w, l2_w, l3_w, inverter_w),
+            (ts_local_bin_start, total_w, l1_w, l2_w, l3_w, grid_l1_w, grid_l2_w, grid_l3_w, inverter_w),
         )
         conn.commit()
 
@@ -89,7 +101,7 @@ def fetch_binned_since(db_path: str, ts_local_start: str) -> List[Dict[str, Any]
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """
-            SELECT ts_local_bin_start, total_w, l1_w, l2_w, l3_w, inverter_w
+            SELECT ts_local_bin_start, total_w, l1_w, l2_w, l3_w, grid_l1_w, grid_l2_w, grid_l3_w, inverter_w
             FROM binned
             WHERE ts_local_bin_start >= ?
             ORDER BY ts_local_bin_start ASC
@@ -104,7 +116,7 @@ def fetch_binned_between(db_path: str, start_local: str, end_local: str) -> List
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """
-            SELECT ts_local_bin_start, total_w, l1_w, l2_w, l3_w, inverter_w
+            SELECT ts_local_bin_start, total_w, l1_w, l2_w, l3_w, grid_l1_w, grid_l2_w, grid_l3_w, inverter_w
             FROM binned
             WHERE ts_local_bin_start >= ? AND ts_local_bin_start < ?
             ORDER BY ts_local_bin_start ASC
@@ -151,3 +163,31 @@ def save_ilc_curve(db_path: str, signal: str, curve: Dict[int, float]) -> None:
             [(signal, int(bin_index), float(value)) for bin_index, value in curve.items()],
         )
         conn.commit()
+
+
+def fetch_latest_measurements(db_path: str) -> Dict[str, Any]:
+    """Fetch the most recent measurements (latest poll timestamp)."""
+    with sqlite3.connect(db_path) as conn:
+        # Get the latest timestamp
+        row = conn.execute(
+            "SELECT MAX(ts_utc) FROM measurements"
+        ).fetchone()
+
+        if not row or row[0] is None:
+            return {"ts_utc": None, "values": {}}
+
+        latest_ts = row[0]
+
+        # Get all measurements at that timestamp
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT entity_id, value FROM measurements WHERE ts_utc = ?",
+            (latest_ts,)
+        ).fetchall()
+
+        values = {row["entity_id"]: row["value"] for row in rows}
+
+        return {
+            "ts_utc": latest_ts,
+            "values": values
+        }
