@@ -30,6 +30,7 @@ class AppConfig:
     ha_token: str
     poll_interval_seconds: int
     bin_minutes: int
+    learning_mode: str
     timezone: str
     horizon_hours: int
     entities: EntityConfig
@@ -90,6 +91,7 @@ def load_config() -> AppConfig:
         ha_token=token,
         poll_interval_seconds=int(os.environ.get("POLL_INTERVAL_SECONDS", "5")),
         bin_minutes=int(os.environ.get("BIN_MINUTES", "1")),
+        learning_mode=os.environ.get("LEARNING_MODE", "ilc_yesterday"),
         timezone=os.environ.get("TIMEZONE", "Europe/Stockholm"),
         horizon_hours=int(os.environ.get("HORIZON_HOURS", "48")),
         entities=EntityConfig(

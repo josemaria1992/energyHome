@@ -1,7 +1,7 @@
 #!/usr/bin/with-contenv bashio
 set -euo pipefail
 
-bashio::log.info "Starting EnergyHome Forecast add-on v0.3.0"
+bashio::log.info "Starting EnergyHome Forecast add-on v0.4.0"
 
 export HA_URL
 HA_URL="$(bashio::config 'ha_url')"
@@ -17,6 +17,8 @@ export POLL_INTERVAL_SECONDS
 POLL_INTERVAL_SECONDS="$(bashio::config 'poll_interval_seconds')"
 export BIN_MINUTES
 BIN_MINUTES="$(bashio::config 'bin_minutes')"
+export LEARNING_MODE
+LEARNING_MODE="$(bashio::config 'learning_mode')"
 export TIMEZONE
 TIMEZONE="$(bashio::config 'timezone')"
 export HORIZON_HOURS

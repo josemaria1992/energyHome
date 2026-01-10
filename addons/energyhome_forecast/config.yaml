@@ -1,6 +1,6 @@
 slug: energyhome_forecast
 name: EnergyHome Forecast
-version: "0.3.0"
+version: "0.4.0"
 description: Collects inverter load data from Home Assistant and serves 48h forecasts with iterative learning correction + UI
 arch:
   - aarch64
@@ -19,6 +19,7 @@ options:
   ha_token: ""
   poll_interval_seconds: 5
   bin_minutes: 1
+  learning_mode: ilc_yesterday
   timezone: Europe/Stockholm
   horizon_hours: 48
   entities:
@@ -40,6 +41,7 @@ schema:
   ha_token: password?
   poll_interval_seconds: int(1,60)
   bin_minutes: int(1,60)
+  learning_mode: list(off|ilc_yesterday|weekday_profile)
   timezone: str
   horizon_hours: int
   entities:

@@ -144,6 +144,36 @@ def render_dashboard(
     </div>
     """
 
+    # Accuracy metrics card (populated by JavaScript)
+    accuracy_card = """
+    <div class="card accuracy-card" id="accuracyCard">
+        <h2 class="section-title">📊 Model Accuracy</h2>
+        <div class="warning-banner" id="metricsError" style="display: none;"></div>
+        <div class="loading" id="metricsLoading">Loading accuracy metrics...</div>
+        <div id="metricsContent" style="display: none;">
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">Hindcast Accuracy (last 7d)</div>
+                    <div class="metric-value" id="accuracyValue">—</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Learning Mode</div>
+                    <div class="metric-value" id="learningMode">—</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Points Used</div>
+                    <div class="metric-value" id="pointsUsed">—</div>
+                </div>
+            </div>
+            <div class="metrics-help">
+                <strong>About hindcast accuracy:</strong> This metric compares the current model's predictions
+                against historical data from the past 7 days. 100% means perfect fit. This should improve as
+                more data is collected and the model learns your usage patterns.
+            </div>
+        </div>
+    </div>
+    """
+
     # Live readings panel (populated by JavaScript)
     live_readings = """
     <div class="card live-readings" id="liveReadings">
@@ -366,11 +396,91 @@ def render_dashboard(
         }
     }
 
+    // Load accuracy metrics
+    async function loadMetrics() {
+        try {
+            const data = await apiGet('metrics');
+            renderMetrics(data);
+        } catch (e) {
+            const errBox = document.getElementById('metricsError');
+            errBox.style.display = 'block';
+            errBox.textContent = '⚠️ Failed to load metrics: ' + e.message;
+            document.getElementById('metricsLoading').style.display = 'none';
+            console.error('Failed to load metrics:', e);
+        }
+    }
+
+    function renderMetrics(data) {
+        document.getElementById('metricsLoading').style.display = 'none';
+        document.getElementById('metricsContent').style.display = 'block';
+
+        // Accuracy percentage
+        const accuracy = data.accuracy_total_w_pct;
+        const accuracyEl = document.getElementById('accuracyValue');
+        if (accuracy !== null && accuracy !== undefined) {
+            accuracyEl.textContent = accuracy.toFixed(1) + '%';
+            // Color code based on accuracy
+            if (accuracy >= 80) {
+                accuracyEl.style.color = '#10b981';  // green
+            } else if (accuracy >= 60) {
+                accuracyEl.style.color = '#fbbf24';  // yellow
+            } else {
+                accuracyEl.style.color = '#ef4444';  // red
+            }
+        } else {
+            accuracyEl.textContent = 'N/A';
+            accuracyEl.style.color = '#94a3b8';
+        }
+
+        // Learning mode with visual indicator
+        const learningMode = data.learning_mode || 'unknown';
+        const learningModeEl = document.getElementById('learningMode');
+        let modeDisplay = learningMode;
+        let modeColor = '#f1f5f9';
+
+        if (learningMode === 'ilc_yesterday') {
+            modeDisplay = 'ILC (Yesterday)';
+            modeColor = '#3b82f6';  // blue
+        } else if (learningMode === 'weekday_profile') {
+            modeDisplay = 'Weekday Profile';
+            modeColor = '#8b5cf6';  // purple
+        } else if (learningMode === 'off') {
+            modeDisplay = 'Off (Baseline Only)';
+            modeColor = '#94a3b8';  // gray
+        }
+
+        learningModeEl.textContent = modeDisplay;
+        learningModeEl.style.color = modeColor;
+
+        // Update ILC button state based on learning mode
+        const ilcButton = document.querySelector('button[onclick="updateILC()"]');
+        if (ilcButton) {
+            if (learningMode !== 'ilc_yesterday') {
+                ilcButton.disabled = true;
+                ilcButton.style.opacity = '0.5';
+                ilcButton.style.cursor = 'not-allowed';
+                ilcButton.title = 'ILC updates are disabled in ' + modeDisplay + ' mode';
+            } else {
+                ilcButton.disabled = false;
+                ilcButton.style.opacity = '1';
+                ilcButton.style.cursor = 'pointer';
+                ilcButton.title = '';
+            }
+        }
+
+        // Points used
+        const pointsUsed = data.n_points_used || 0;
+        document.getElementById('pointsUsed').textContent = pointsUsed.toLocaleString();
+    }
+
     // Load live readings when page loads and set up auto-refresh
     window.addEventListener('DOMContentLoaded', function() {
         loadLiveReadings();
+        loadMetrics();
         // Auto-refresh live readings every 5 seconds
         setInterval(loadLiveReadings, 5000);
+        // Refresh metrics every 60 seconds
+        setInterval(loadMetrics, 60000);
     });
     </script>
     """
@@ -437,11 +547,56 @@ def render_dashboard(
             margin-bottom: 24px;
         }
 
+        .accuracy-card {
+            margin-bottom: 24px;
+        }
+
         .loading {
             color: #94a3b8;
             font-size: 14px;
             padding: 20px 0;
             text-align: center;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .metric-item {
+            background: #0f172a;
+            border: 1px solid #1e293b;
+            border-radius: 6px;
+            padding: 16px;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .metrics-help {
+            border-top: 1px solid #334155;
+            padding-top: 12px;
+            font-size: 13px;
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+
+        .metrics-help strong {
+            color: #f1f5f9;
+            display: block;
+            margin-bottom: 4px;
         }
 
         .readings-grid {
@@ -594,6 +749,8 @@ def render_dashboard(
         <h1>⚡ EnergyHome Forecast</h1>
 
         {status_cards}
+
+        {accuracy_card}
 
         {live_readings}
 

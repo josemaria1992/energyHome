@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List
 
+import numpy as np
 import pandas as pd
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
@@ -155,6 +156,11 @@ async def poll_loop() -> None:
 
 
 async def maybe_update_ilc(bin_start: datetime) -> None:
+    # Skip ILC updates if learning mode is not "ilc_yesterday"
+    if config.learning_mode != "ilc_yesterday":
+        logger.info("ILC update skipped: learning_mode=%s", config.learning_mode)
+        return
+
     today = bin_start.date()
     last_update = get_metadata(config.db_path, "last_ilc_update_local")
     if not should_update_ilc(last_update, today):
@@ -225,16 +231,19 @@ def build_forecast_payload() -> Dict[str, List]:
         "l3_w": fetch_ilc_curve(config.db_path, "l3_w"),
         "inverter_w": fetch_ilc_curve(config.db_path, "inverter_w"),
     }
-    timestamps, values = forecast_module.build_forecast(df, config.horizon_hours, curves)
+    timestamps, values = forecast_module.build_forecast(
+        df, config.horizon_hours, curves, config.learning_mode
+    )
     return {"timestamps": timestamps, **values}
 
 
 @app.on_event("startup")
 async def startup_event() -> None:
     global ha_client
-    logger.info("EnergyHome Forecast v0.3.0 starting...")
+    logger.info("EnergyHome Forecast v0.4.0 starting...")
     logger.info("Database path: %s", config.db_path)
     logger.info("Polling interval: %d seconds (bin size: %d minutes)", config.poll_interval_seconds, config.bin_minutes)
+    logger.info("Learning mode: %s", config.learning_mode)
     logger.info("Timezone: %s", config.timezone)
     logger.info("Forecast horizon: %d hours", config.horizon_hours)
     init_db(config.db_path)
@@ -364,6 +373,11 @@ async def recompute() -> Dict[str, str]:
 
 @app.post("/api/ilc/update")
 async def ilc_update() -> Dict[str, str]:
+    if config.learning_mode != "ilc_yesterday":
+        return {
+            "status": "skipped",
+            "reason": f"learning_mode={config.learning_mode}; ILC disabled"
+        }
     now_local = _now_utc().astimezone(_local_tz())
     await maybe_update_ilc(now_local)
     return {"status": "ok"}
@@ -397,6 +411,118 @@ async def export_db():
         media_type="application/x-sqlite3",
         filename="energyhome_backup.sqlite"
     )
+
+
+@app.get("/api/metrics")
+async def metrics() -> Dict[str, object]:
+    """
+    Compute forecast accuracy metrics by comparing model estimates with actual values.
+    This is a "hindcast" accuracy - comparing current model predictions to historical data.
+    """
+    evaluation_days = 7
+    now_local = _now_utc().astimezone(_local_tz())
+    start_local = (now_local - timedelta(days=evaluation_days)).isoformat()
+
+    # Fetch historical binned data
+    rows = fetch_binned_since(config.db_path, start_local)
+    df = _dataframe_from_rows(rows)
+
+    if df.empty:
+        return {
+            "evaluation_window_days": evaluation_days,
+            "accuracy_total_w_pct": None,
+            "n_points_used": 0,
+            "learning_mode": config.learning_mode,
+            "timestamp": now_local.isoformat(),
+            "error": "No historical data available"
+        }
+
+    # Build baseline models based on learning mode
+    if config.learning_mode == "weekday_profile":
+        # Build weekday-specific baselines
+        weekday_baselines = {}
+        for dow in range(7):
+            baseline = forecast_module.compute_baseline_weekday(df, "total_w", dow)
+            weekday_baselines[dow] = forecast_module.smooth_baseline(baseline)
+
+        # Compute estimates for each historical point
+        estimates = []
+        actuals = []
+        for _, row in df.iterrows():
+            actual = row.get("total_w")
+            if actual is None or pd.isna(actual):
+                continue
+            ts = row["ts_local"]
+            dow = ts.dayofweek
+            bin_idx = int(ts.hour * 4 + ts.minute / 15)
+            estimate = weekday_baselines[dow].get(bin_idx, 0.0)
+            estimates.append(max(0.0, estimate))
+            actuals.append(actual)
+
+    elif config.learning_mode == "off":
+        # Global baseline without ILC
+        baseline = forecast_module.compute_baseline(df, "total_w")
+        baseline = forecast_module.smooth_baseline(baseline)
+
+        estimates = []
+        actuals = []
+        for _, row in df.iterrows():
+            actual = row.get("total_w")
+            if actual is None or pd.isna(actual):
+                continue
+            ts = row["ts_local"]
+            bin_idx = int(ts.hour * 4 + ts.minute / 15)
+            estimate = baseline.get(bin_idx, 0.0)
+            estimates.append(max(0.0, estimate))
+            actuals.append(actual)
+
+    else:  # learning_mode == "ilc_yesterday"
+        # Global baseline + ILC correction
+        baseline = forecast_module.compute_baseline(df, "total_w")
+        baseline = forecast_module.smooth_baseline(baseline)
+        ilc_curve = fetch_ilc_curve(config.db_path, "total_w")
+
+        estimates = []
+        actuals = []
+        for _, row in df.iterrows():
+            actual = row.get("total_w")
+            if actual is None or pd.isna(actual):
+                continue
+            ts = row["ts_local"]
+            bin_idx = int(ts.hour * 4 + ts.minute / 15)
+            base_value = baseline.get(bin_idx, 0.0)
+            correction = ilc_curve.get(bin_idx, 0.0)
+            estimate = base_value + correction
+            estimates.append(max(0.0, estimate))
+            actuals.append(actual)
+
+    # Compute accuracy metrics
+    n_points = len(actuals)
+    if n_points == 0:
+        return {
+            "evaluation_window_days": evaluation_days,
+            "accuracy_total_w_pct": None,
+            "n_points_used": 0,
+            "learning_mode": config.learning_mode,
+            "timestamp": now_local.isoformat(),
+            "error": "No valid data points for evaluation"
+        }
+
+    # Calculate NMAE (Normalized Mean Absolute Error)
+    actuals_arr = np.array(actuals)
+    estimates_arr = np.array(estimates)
+    mae = np.mean(np.abs(actuals_arr - estimates_arr))
+    mean_actual = np.mean(np.abs(actuals_arr)) + 1e-6  # epsilon to prevent division by zero
+    nmae = mae / mean_actual
+    accuracy_pct = max(0.0, 100.0 * (1.0 - nmae))
+
+    return {
+        "evaluation_window_days": evaluation_days,
+        "accuracy_total_w_pct": round(accuracy_pct, 1),
+        "n_points_used": n_points,
+        "learning_mode": config.learning_mode,
+        "timestamp": now_local.isoformat(),
+    }
 
 
 @app.get("/ui", response_class=HTMLResponse)
