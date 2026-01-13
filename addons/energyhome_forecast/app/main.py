@@ -394,7 +394,7 @@ def build_forecast_payload() -> Dict[str, List]:
 @app.on_event("startup")
 async def startup_event() -> None:
     global ha_client
-    logger.info("EnergyHome Forecast v0.4.1 starting...")
+    logger.info("EnergyHome Forecast v0.4.2 starting...")
     logger.info("Database path: %s", config.db_path)
     logger.info("Polling interval: %d seconds (bin size: %d minutes)", config.poll_interval_seconds, config.bin_minutes)
     logger.info("Learning mode: %s", config.learning_mode)
