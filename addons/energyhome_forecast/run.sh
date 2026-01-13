@@ -1,7 +1,7 @@
 #!/usr/bin/with-contenv bashio
 set -euo pipefail
 
-bashio::log.info "Starting EnergyHome Forecast add-on v0.2.0"
+bashio::log.info "Starting EnergyHome Forecast add-on v0.4.0"
 
 export HA_URL
 HA_URL="$(bashio::config 'ha_url')"
@@ -13,8 +13,12 @@ HA_TOKEN="$(bashio::config 'ha_token')"
 if [ -z "${HA_TOKEN}" ] || [ "${HA_TOKEN}" = "null" ]; then
   HA_TOKEN="${SUPERVISOR_TOKEN:-}"
 fi
-export POLL_INTERVAL_MINUTES
-POLL_INTERVAL_MINUTES="$(bashio::config 'poll_interval_minutes')"
+export POLL_INTERVAL_SECONDS
+POLL_INTERVAL_SECONDS="$(bashio::config 'poll_interval_seconds')"
+export BIN_MINUTES
+BIN_MINUTES="$(bashio::config 'bin_minutes')"
+export LEARNING_MODE
+LEARNING_MODE="$(bashio::config 'learning_mode')"
 export TIMEZONE
 TIMEZONE="$(bashio::config 'timezone')"
 export HORIZON_HOURS
@@ -35,6 +39,16 @@ export ENTITY_GRID_L2_CURRENT
 ENTITY_GRID_L2_CURRENT="$(bashio::config 'entities.grid_l2_current')"
 export ENTITY_GRID_L3_CURRENT
 ENTITY_GRID_L3_CURRENT="$(bashio::config 'entities.grid_l3_current')"
+export ENTITY_GRID_L1_POWER
+ENTITY_GRID_L1_POWER="$(bashio::config 'entities.grid_l1_power')"
+export ENTITY_GRID_L2_POWER
+ENTITY_GRID_L2_POWER="$(bashio::config 'entities.grid_l2_power')"
+export ENTITY_GRID_L3_POWER
+ENTITY_GRID_L3_POWER="$(bashio::config 'entities.grid_l3_power')"
+export ENTITY_INVERTER_LOAD_POWER
+ENTITY_INVERTER_LOAD_POWER="$(bashio::config 'entities.inverter_load_power')"
+export GRID_VOLTAGE_V
+GRID_VOLTAGE_V="$(bashio::config 'grid_voltage_v')"
 export DB_PATH
 DB_PATH="/data/energyhome.sqlite"
 if [ -f "${DB_PATH}" ]; then
@@ -43,4 +57,4 @@ else
   bashio::log.info "Creating new database at ${DB_PATH}"
 fi
 
-exec uvicorn app.main:app --host 0.0.0.0 --port 8080
+exec uvicorn main:app --app-dir /app --host 0.0.0.0 --port 8080

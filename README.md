@@ -1,8 +1,5 @@
 # energyHome
 
-## Home Assistant Add-on Repository
-
-This repository includes the EnergyHome Forecast Home Assistant add-on, which uses the Supervisor token by default.
 
 ### Add the repository in Home Assistant
 
